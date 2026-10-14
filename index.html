@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>モルック得点表</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f5f7;color:#222;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}
+.wrap{max-width:760px;margin:auto;padding:14px}h1{text-align:center;font-size:24px;margin:6px 0 14px}
+.card{background:#fff;border-radius:16px;padding:15px;margin-bottom:14px;box-shadow:0 2px 10px #0001}h2{font-size:18px;margin:0 0 12px}
+button,input{font:inherit}button{border:0;border-radius:12px;padding:11px 14px;background:#e9edf2;font-weight:600}button.primary{background:#222;color:#fff}
+button.danger{background:#ffe2e2}.row{display:flex;gap:8px;flex-wrap:wrap}.mode{display:flex;gap:8px}.mode button.active{background:#222;color:#fff}
+input{width:100%;padding:10px;border:1px solid #ccd2d8;border-radius:10px;margin:4px 0}.teamset{border:1px solid #ddd;border-radius:12px;padding:12px;margin:8px 0}
+.member{display:flex;align-items:center;gap:6px}.member span{width:28px;text-align:center;font-weight:bold}
+.bigturn{text-align:center;padding:16px;border-radius:14px;background:#eef3ff;margin-bottom:12px}.small{font-size:13px;color:#555}.who{font-size:30px;font-weight:800;margin:5px 0}.team{font-size:16px;font-weight:700}
+.scoregrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.scoregrid button{font-size:20px;padding:15px 5px}.scoregrid .miss{background:#ffe5e5}
+.currentTeams{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.teamcard{border:2px solid #ddd;border-radius:13px;padding:10px}.teamcard.active{border-color:#222;background:#fafafa}
+.teamname{font-weight:800}.points{font-size:28px;font-weight:800}.sub{font-size:12px;color:#666}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid #ddd;padding:8px 5px;text-align:center;white-space:nowrap}th{background:#f5f6f7}.scroll{overflow:auto}
+.note{font-size:12px;color:#666;line-height:1.5}.hidden{display:none!important}.winner{font-size:22px;font-weight:800;text-align:center;padding:12px;background:#e8f7eb;border-radius:12px}
+@media(max-width:430px){.currentTeams{grid-template-columns:1fr 1fr}.currentTeams .teamcard:last-child:nth-child(3){grid-column:1/3}.who{font-size:27px}}
+</style></head><body><div class="wrap">
+<h1>🎯 モルック得点表</h1>
+
+<section id="setup" class="card">
+<h2>チーム設定</h2>
+<div class="row"><button id="count2" class="primary" onclick="setCount(2)">2チーム</button><button id="count3" onclick="setCount(3)">3チーム</button></div>
+<div class="mode" style="margin-top:10px"><button id="normalMode" class="active" onclick="setMode('normal')">通常モード</button><button id="simpleMode" onclick="setMode('simple')">簡易モード</button></div>
+<div style="margin-top:12px"><b>セット方式</b><div class="mode" style="margin-top:6px"><button id="set2" class="active" onclick="setTargetSets(2)">2セット先取</button><button id="set3" onclick="setTargetSets(3)">3セット先取</button></div><p class="note">2セット先取＝最大3セット、3セット先取＝最大5セット</p></div>
+<div style="margin-top:12px"><b>1セットの投擲回数（1チームあたり）</b>
+<div class="mode" style="margin-top:6px"><button id="throws10" class="active" onclick="setThrowLimit(10)">10回</button><button id="throws12" onclick="setThrowLimit(12)">12回</button><button id="throws0" onclick="setThrowLimit(0)">制限なし</button></div>
+<p class="note">規定回数終了時に50点未満なら、そのセットの得点が高いチームが勝ちです。1チームが3回連続でミスすると、そのチームは失格となりセットを落とします。3チーム戦では失格チームを除いて続行します。</p></div>
+<div id="teamInputs"></div>
+<div class="row"><button onclick="saveSettings()">💾 保存</button><button onclick="loadSettings()">📂 保存した設定を読み込む</button></div>
+<div class="row" style="margin-top:8px"><button onclick="swapSetup()">↔ 先攻を入れ替える</button></div>
+<p id="orderText" class="note"></p>
+<button class="primary" style="width:100%" onclick="startGame()">ゲーム開始</button>
+<p class="note">1チームが3回連続でミスすると失格となり、そのセットを落とします。3チーム対戦では失格チームを除いた残りのチームで続行します。名前が未入力のメンバーは、打順・個人分析の対象に含めません。</p></section>
+
+<section id="game" class="hidden">
+<div id="setBox" class="card" style="text-align:center"></div>
+<div id="turnBox" class="bigturn"></div><div id="winnerBox"></div>
+<div class="card"><h2>現在のスコア</h2><div id="teamCards" class="currentTeams"></div></div>
+<div class="card"><h2>得点入力</h2>
+<div class="scoregrid">
+<button onclick="add(1)">1</button><button onclick="add(2)">2</button><button onclick="add(3)">3</button><button onclick="add(4)">4</button>
+<button onclick="add(5)">5</button><button onclick="add(6)">6</button><button onclick="add(7)">7</button><button onclick="add(8)">8</button>
+<button onclick="add(9)">9</button><button onclick="add(10)">10</button><button onclick="add(11)">11</button><button onclick="add(12)">12</button>
+<button class="miss" onclick="add(0)">✕ ミス</button></div>
+<div class="row" style="margin-top:10px"><button onclick="undo()">↩ 直前の入力を戻す</button><button onclick="swapGame()">↔ 先攻順を変更</button><button class="danger" onclick="resetGame()">ゲームをリセット</button></div>
+</div>
+
+<div class="card"><h2>📊 メンバー別分析</h2>
+<div class="scroll"><table><thead><tr><th>チーム</th><th>メンバー</th><th>得点</th><th>打数</th><th>ミス</th><th>ミス率</th><th>1打得点</th></tr></thead>
+<tbody id="memberAnalysis"></tbody></table></div></div>
+
+<div class="card"><h2>📊 チーム分析</h2>
+<div class="scroll"><table><thead><tr><th>チーム</th><th>得点</th><th>打数</th><th>ミス</th><th>ミス率</th></tr></thead><tbody id="teamAnalysis"></tbody></table></div></div>
+
+<div class="card"><h2>📜 履歴</h2><div class="scroll"><table><thead><tr><th>回</th><th>チーム</th><th>メンバー</th><th>入力</th><th>得点後</th></tr></thead><tbody id="history"></tbody></table></div></div>
+<div class="card"><h2>📊 セット別メンバー分析</h2><p class="note">終了したセットの分析は、次のセットに進んでもここに残ります。進行中のセットは随時更新されます。</p><div class="scroll"><table><thead><tr><th>セット</th><th>チーム</th><th>メンバー</th><th>得点</th><th>打数</th><th>ミス</th><th>ミス率</th><th>1打得点</th></tr></thead><tbody id="setMemberAnalysis"></tbody></table></div><button type="button" style="width:100%;margin-top:10px" onclick="exportMemberCSV()">📥 メンバー分析をCSV出力</button></div>
+<div class="card"><button id="backButton" type="button" style="width:100%">設定画面に戻る</button></div>
+</section></div>
+
+<script>
+let n=2,mode='normal',start=0,teams=[],cur=0,turn=1,hist=[],over=false,targetSets=2,setNo=1,setWins=[],throwLimit=10,setThrowCounts=[],pendingTransition=false,nextStarter=0,consecutiveMisses=[],disqualified=[],setArchive=[];
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+function setCount(x){n=x;renderSettings();orderText()}
+function setMode(x){mode=x;normalMode.classList.toggle('active',x==='normal');simpleMode.classList.toggle('active',x==='simple');renderSettings()}
+function setTargetSets(x){targetSets=x;set2.classList.toggle('active',x===2);set3.classList.toggle('active',x===3)}
+function setThrowLimit(x){throwLimit=x;throws10.classList.toggle('active',x===10);throws12.classList.toggle('active',x===12);throws0.classList.toggle('active',x===0)}
+function renderSettings(){
+ teamInputs.innerHTML='';
+ for(let i=0;i<n;i++){let t=teams[i]||{name:'チーム '+String.fromCharCode(65+i),members:['','','','']};
+ let s='<div class="teamset"><b>チーム '+String.fromCharCode(65+i)+'</b><input id="tn'+i+'" placeholder="チーム名" value="'+esc(t.name)+'">';
+ if(mode==='normal')for(let j=0;j<4;j++)s+='<div class="member"><span>'+(j+1)+'</span><input id="mn'+i+'_'+j+'" placeholder="メンバー'+(j+1)+'" value="'+esc((t.members||[])[j]||'')+'"></div>';
+ s+='</div>';teamInputs.innerHTML+=s}
+renderOrderEditors();}
+function syncSettingsToTeams(){
+ // Read current team/member inputs before reordering, so changes are applied to the actual form values.
+ let fresh=collect();
+ fresh.forEach((t,i)=>{
+   if(teams[i]){
+     t.score=teams[i].score||0;t.prevScores=teams[i].prevScores||[];t.totalScore=teams[i].totalScore||0;
+     t.misses=teams[i].misses||0;t.turns=teams[i].turns||0;t.stats=teams[i].stats||[];
+   }
+ });
+ teams=fresh;
+}
+function moveMember(ti,mi,delta){
+ syncSettingsToTeams();
+ let arr=teams[ti]&&teams[ti].members;
+ if(!arr||mi+delta<0||mi+delta>=arr.length)return;
+ [arr[mi],arr[mi+delta]]=[arr[mi+delta],arr[mi]];
+ // Write reordered names back into the visible inputs immediately.
+ for(let j=0;j<4;j++){let el=document.getElementById('mn'+ti+'_'+j);if(el)el.value=''}
+ arr.forEach((name,j)=>{let el=document.getElementById('mn'+ti+'_'+j);if(el)el.value=name});
+ renderOrderEditors();
+}
+function renderOrderEditors(){
+ let box=document.getElementById('orderEditorsBody');if(!box)return;
+ if(mode==='simple'){box.innerHTML='<p class="note">簡易モードではメンバー順の設定はありません。</p>';return}
+ let fresh=collect();
+ box.innerHTML=fresh.slice(0,n).map((t,ti)=>'<div style="margin:10px 0;padding:10px;border:1px solid #ddd;border-radius:10px"><b>'+esc(t.name||('チーム'+(ti+1)))+'</b>'+((t.members||[]).map((m,mi)=>'<div class="row" style="justify-content:space-between;align-items:center;margin-top:6px"><span>'+(mi+1)+'. '+esc(m||'（未入力）')+'</span><span><button type="button" '+(mi===0?'disabled':'')+' onclick="moveMember('+ti+','+mi+',-1)">↑</button> <button type="button" '+(mi===t.members.length-1?'disabled':'')+' onclick="moveMember('+ti+','+mi+',1)">↓</button></span></div>').join(''))+'</div>').join('');
+}
+function collect(){let a=[];for(let i=0;i<n;i++){let m=[];if(mode==='normal')for(let j=0;j<4;j++){let v=(document.getElementById('mn'+i+'_'+j)?.value||'').trim();if(v)m.push(v)}const nameEl=document.getElementById('tn'+i);a.push({name:(nameEl?.value||'').trim()||'チーム '+String.fromCharCode(65+i),members:m})}return a}
+function saveSettings(){teams=collect();renderOrderEditors();localStorage.setItem('molkky_team_settings_v5',JSON.stringify({n,mode,start,targetSets,throwLimit,teams}));alert('チーム名・メンバーを保存しました。')}
+function loadSettings(){let x=localStorage.getItem('molkky_team_settings_v5')||localStorage.getItem('molkky_team_settings_v4');if(!x){alert('保存された設定がありません。');return}let d=JSON.parse(x);n=d.n||2;mode=d.mode||'normal';start=d.start||0;targetSets=d.targetSets||2;throwLimit=(d.throwLimit===undefined?10:d.throwLimit);teams=d.teams||[];setMode(mode);setTargetSets(targetSets);setThrowLimit(throwLimit);renderSettings();orderText();alert('保存した設定を読み込みました。')}
+function orderText(){let a=[];for(let k=0;k<n;k++)a.push((teams[(start+k)%n]?.name)||('チーム '+String.fromCharCode(65+(start+k)%n)));document.getElementById('orderText').textContent='先攻順：'+a.join(' → ')+' → 繰り返し'}
+function swapSetup(){start=(start+1)%n;orderText()}
+function startGame(){
+ teams=collect();if(teams.length<2){alert('2チーム以上で設定してください。');return}teams.forEach(t=>{t.members=(t.members||[]).map(x=>(x||'').trim()).filter(Boolean);t.score=0;t.prevScores=[];t.totalScore=0;t.misses=0;t.turns=0;t.stats=t.members.map(x=>({name:x,score:0,turns:0,misses:0}))});
+ cur=start;nextStarter=start;turn=1;hist=[];setArchive=[];over=false;setNo=1;setWins=teams.map(()=>0);setThrowCounts=teams.map(()=>0);consecutiveMisses=teams.map(()=>0);disqualified=teams.map(()=>false);pendingTransition=false;
+ document.getElementById('setup').classList.add('hidden');document.getElementById('setup').style.display='none';document.getElementById('game').classList.remove('hidden');document.getElementById('game').style.display='block';update()
+}
+function mi(t){if(mode==='simple'||!t.stats.length)return -1;return t.turns%t.stats.length}
+function add(p){
+ if(over||pendingTransition||disqualified[cur])return;
+ let t=teams[cur],idx=mi(t),es=setNo,et=turn,ei=cur,em=idx>=0?t.stats[idx].name:'-';
+ let before={
+  scores:teams.map(x=>x.score),prevScores:teams.map(x=>(x.prevScores||[]).slice()),totalScores:teams.map(x=>x.totalScore||0),
+  misses:teams.map(x=>x.misses),turns:teams.map(x=>x.turns),stats:teams.map(x=>x.stats.map(m=>({...m}))),
+  cur,turn,over,setNo,setWins:[...setWins],setThrowCounts:[...setThrowCounts],nextStarter,pendingTransition,
+  consecutiveMisses:[...consecutiveMisses],disqualified:[...disqualified],setArchive:JSON.parse(JSON.stringify(setArchive))
+ };
+ t.turns++;setThrowCounts[cur]++;if(p===0){t.misses++;consecutiveMisses[cur]++}else{consecutiveMisses[cur]=0}
+ if(idx>=0){t.stats[idx].turns++;t.stats[idx].score+=p;if(p===0)t.stats[idx].misses++}
+ t.score+=p;let note='',ended=false,winner=null;
+
+ if(p===0 && consecutiveMisses[cur]>=3){
+   disqualified[cur]=true;
+   note=teams[cur].name+'が3回連続ミスで失格';
+   let active=teams.map((x,i)=>i).filter(i=>!disqualified[i]);
+   if(active.length===1){
+     winner=active[0];ended=true;note+='・残った'+teams[winner].name+'がセット勝利';
+   }else{
+     note+='・失格チームを除いて続行';
+   }
+ } else {
+   if(t.score>50){t.score=25;note='50点超過→25点'}
+   if(t.score===50){winner=cur;ended=true;note=(note?note+'・':'')+'50点到達でセット勝利'}
+ }
+ let activeTeams=teams.map((x,i)=>i).filter(i=>!disqualified[i]);
+ if(!ended && throwLimit>0 && activeTeams.length>0 && activeTeams.every(i=>setThrowCounts[i]>=throwLimit)){
+   let max=Math.max(...activeTeams.map(i=>teams[i].score));
+   let wins=activeTeams.filter(i=>teams[i].score===max);ended=true;
+   if(wins.length===1){winner=wins[0];note='投擲制限終了・'+teams[winner].name+'がセット勝利（'+max+'点）'}
+   else note='投擲制限終了・同点のためセット勝者なし';
+ }
+ if(ended){
+   setArchive.push({set:setNo,winner:winner===null?'セット勝者なし':teams[winner].name,teams:teams.map((x,i)=>({name:x.name,score:x.score,turns:x.turns,misses:x.misses,disqualified:!!disqualified[i],stats:x.stats.map(m=>({...m}))}))});
+   if(winner!==null){setWins[winner]++;if(setWins[winner]>=targetSets){over=true;note+='・大会優勝'}}
+   if(!over){
+     teams.forEach(x=>{x.prevScores=x.prevScores||[];x.prevScores.push(x.score);x.totalScore=(x.totalScore||0)+x.score;x.score=0;x.misses=0;x.turns=0;x.stats.forEach(m=>{m.score=0;m.turns=0;m.misses=0})});
+     setNo++;setThrowCounts=teams.map(()=>0);consecutiveMisses=teams.map(()=>0);disqualified=teams.map(()=>false);
+     if(setNo===2)nextStarter=(n===2?1-start:(start+1)%n);
+     else if(setNo===3)nextStarter=null;
+     else nextStarter=(nextStarter===null?start:(nextStarter+1)%n);
+     cur=(nextStarter===null?0:nextStarter);turn=1;pendingTransition=true;
+     note+=' → 第'+setNo+'セット準備';
+   }
+ }
+ hist.push({set:es,turn:et,team:ei,member:em,input:p,after:teams[ei].score,note,before});
+ if(!over&&!ended){
+   let active=teams.map((x,i)=>i).filter(i=>!disqualified[i]);
+   if(active.length){
+     let pos=active.indexOf(cur);
+     cur=active[(pos+1)%active.length];
+     turn++;
+   }
+ }
+ update();
+ if(pendingTransition)showTransition()
+}
+function showTransition(){
+ let modal=document.getElementById('setTransitionModal');
+ document.getElementById('transitionTitle').textContent='第'+setNo+'セットの準備';
+ document.getElementById('transitionMessage').textContent='セットが終了しました。次のセットを始めます。';
+ let picker=document.getElementById('starterPicker'),question=document.getElementById('orderQuestion');
+ picker.style.display=(setNo===3)?'block':'none';
+ question.style.display='block';
+ picker.querySelector('.row').innerHTML=teams.map((t,i)=>'<button type="button" id="starter'+i+'" class="'+(nextStarter===i?'primary':'')+'" onclick="chooseStarter('+i+')">'+esc(t.name)+'が先攻</button>').join('');
+ renderTransitionOrderEditors();
+ modal.style.display='flex';modal.classList.remove('hidden');
+}
+function renderTransitionOrderEditors(){
+ let box=document.getElementById('transitionOrderEditors');
+ if(mode==='simple'){box.innerHTML='<p class="note">簡易モードではメンバー打順の変更はありません。</p>';return}
+ box.innerHTML=teams.map((t,ti)=>'<div style="border:1px solid #ddd;border-radius:10px;padding:8px;margin:8px 0"><b>'+esc(t.name)+'</b>'+((t.members||[]).filter(Boolean).map((m,mi)=>'<div class="row" style="justify-content:space-between;align-items:center;margin-top:5px"><span>'+(mi+1)+'. '+esc(m)+'</span><span><button type="button" '+(mi===0?'disabled':'')+' onclick="moveTransitionMember('+ti+','+mi+',-1)">↑</button> <button type="button" '+(mi===t.members.filter(Boolean).length-1?'disabled':'')+' onclick="moveTransitionMember('+ti+','+mi+',1)">↓</button></span></div>').join('')||'<p class="note">メンバー未登録</p>')+'</div>').join('');
+}
+function moveTransitionMember(ti,mi,delta){
+ let arr=teams[ti].members;if(mi+delta<0||mi+delta>=arr.length)return;
+ [arr[mi],arr[mi+delta]]=[arr[mi+delta],arr[mi]];
+ teams[ti].stats=arr.map(x=>({name:x||'（未入力）',score:0,turns:0,misses:0}));
+ renderTransitionOrderEditors();update();
+}
+function chooseStarter(i){
+ nextStarter=i;cur=i;
+ document.querySelectorAll('#starterPicker button').forEach((b,j)=>b.classList.toggle('primary',j===i));
+}
+function finishTransition(changeOrder){
+ if(setNo===3 && nextStarter===null){alert('先攻チームを選んでください。');return}
+ cur=nextStarter===null?start:nextStarter;pendingTransition=false;
+ let modal=document.getElementById('setTransitionModal');modal.style.display='none';modal.classList.add('hidden');
+ update()
+}
+function undo(){
+ if(!hist.length)return;let h=hist.pop(),b=h.before;
+ teams.forEach((t,i)=>{t.score=b.scores[i];t.prevScores=[...b.prevScores[i]];t.totalScore=b.totalScores[i];t.misses=b.misses[i];t.turns=b.turns[i];t.stats=b.stats[i].map(m=>({...m}))});
+ cur=b.cur;turn=b.turn;over=b.over;setNo=b.setNo;setWins=[...b.setWins];setThrowCounts=[...b.setThrowCounts];nextStarter=b.nextStarter;pendingTransition=b.pendingTransition;consecutiveMisses=[...(b.consecutiveMisses||teams.map(()=>0))];disqualified=[...(b.disqualified||teams.map(()=>false))];setArchive=JSON.parse(JSON.stringify(b.setArchive||[]));
+ let modal=document.getElementById('setTransitionModal');if(modal){modal.style.display='none';modal.classList.add('hidden')}
+ update()
+}
+function swapGame(){if(hist.length){alert('得点入力後は先攻順を変更できません。リセットしてから変更してください。');return}start=(start+1)%n;cur=start;update()}
+function pct(a,b){return b?Math.round(a/b*100)+'%':'0%'}function avg(a,b){return b?(a/b).toFixed(1):'0.0'}
+function update(){
+ let t=teams[cur],idx=mi(t),who=mode==='simple'?'メンバー登録なし':idx>=0?t.stats[idx].name:'メンバー未登録';
+ setBox.innerHTML='<div style="font-size:18px;font-weight:800">第'+setNo+'セット</div><div style="margin-top:5px">先取：'+targetSets+'セット ／ 1チーム '+(throwLimit===0?'制限なし':throwLimit+'回')+'</div><div class="row" style="justify-content:center;margin-top:8px">'+teams.map((x,i)=>'<div style="padding:6px 12px;border-radius:10px;background:#f1f3f5"><b>'+esc(x.name)+'</b> '+setWins[i]+'セット</div>').join('')+'</div>';
+ turnBox.innerHTML='<div class="small">第'+turn+'投目・次の番</div><div class="who">'+esc(who)+'</div><div class="team">'+esc(t.name)+'</div>';
+ winnerBox.innerHTML=over?'<div class="winner">🏆 '+esc(teams.find((x,i)=>setWins[i]>=targetSets)?.name||'')+' の勝利！</div>':'';
+ teamCards.innerHTML=teams.map((x,i)=>'<div class="teamcard '+(i===cur&&!over?'active':'')+'"><div class="teamname">'+esc(x.name)+(disqualified[i]?' <span style="color:#c62828">【失格】</span>':'')+'</div><div class="points">'+x.score+'点 '+(x.prevScores||[]).map(s=>' <span style="font-size:14px">('+s+')</span>').join('')+'</div><div class="sub">今回 '+x.turns+'投・ミス合計 '+x.misses+'回</div><div style="margin-top:5px;padding:6px 8px;border-radius:8px;background:'+(consecutiveMisses[i]?'#ffebee':'#e8f5e9')+';color:'+(consecutiveMisses[i]?'#b71c1c':'#1b5e20')+';font-weight:800">連続ミス：'+consecutiveMisses[i]+' / 3回'+(consecutiveMisses[i]===2?' ⚠️ 次のミスで失格':'')+'</div><div class="sub">合計 '+((x.totalScore||0)+x.score)+'点</div><div class="sub">セット '+setWins[i]+'勝</div></div>').join('');
+ memberAnalysis.innerHTML=teams.flatMap(t=>t.stats.map(m=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(m.name)+'</td><td>'+m.score+'</td><td>'+m.turns+'</td><td>'+m.misses+'</td><td>'+pct(m.misses,m.turns)+'</td><td>'+avg(m.score,m.turns)+'</td></tr>')).join('');
+ teamAnalysis.innerHTML=teams.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+t.score+'</td><td>'+t.turns+'</td><td>'+t.misses+'</td><td>'+pct(t.misses,t.turns)+'</td><td>'+((t.totalScore||0)+t.score)+'</td></tr>').join('');
+ history.innerHTML=hist.slice().reverse().map(h=>'<tr><td>S'+h.set+'-'+h.turn+'</td><td>'+esc(teams[h.team].name)+'</td><td>'+esc(h.member)+'</td><td>'+(h.input===0?'ミス':h.input)+'</td><td>'+h.after+(h.note?'（'+h.note+'）':'')+'</td></tr>').join('');
+ const rows=[];
+ setArchive.forEach(a=>a.teams.forEach(t=>t.stats.forEach(m=>rows.push('<tr><td>第'+a.set+'セット</td><td>'+esc(t.name)+'</td><td>'+esc(m.name)+'</td><td>'+m.score+'</td><td>'+m.turns+'</td><td>'+m.misses+'</td><td>'+pct(m.misses,m.turns)+'</td><td>'+avg(m.score,m.turns)+'</td></tr>'))));
+ if(!over&&!pendingTransition){
+   teams.forEach(t=>t.stats.forEach(m=>rows.push('<tr><td>第'+setNo+'セット（進行中）</td><td>'+esc(t.name)+'</td><td>'+esc(m.name)+'</td><td>'+m.score+'</td><td>'+m.turns+'</td><td>'+m.misses+'</td><td>'+pct(m.misses,m.turns)+'</td><td>'+avg(m.score,m.turns)+'</td></tr>')));
+ }
+ setMemberAnalysis.innerHTML=rows.join('')||'<tr><td colspan="8">メンバー分析データはありません</td></tr>';
+}
+function resetGame(){if(confirm('現在のゲームをリセットしますか？'))startGame()}
+function back(){
+ const gameEl=document.getElementById('game'),setupEl=document.getElementById('setup'),modal=document.getElementById('setTransitionModal');
+ if(modal){modal.style.display='none';modal.classList.add('hidden')}
+ if(gameEl){gameEl.classList.add('hidden');gameEl.style.display='none'}
+ if(setupEl){setupEl.classList.remove('hidden');setupEl.style.display='block'}
+ pendingTransition=false;
+ renderSettings();orderText();window.scrollTo(0,0);
+}
+document.getElementById('backButton')?.addEventListener('click',back);
+function csvCell(v){let x=String(v??'');return '"'+x.replace(/"/g,'""')+'"'}
+function exportMemberCSV(){
+ const lines=[['セット','チーム','メンバー','得点','打数','ミス','ミス率','1打得点']];
+ const snapshots=setArchive.map(a=>({set:'第'+a.set+'セット',teams:a.teams}));
+ if(!over&&!pendingTransition)snapshots.push({set:'第'+setNo+'セット（進行中）',teams:teams.map(t=>({name:t.name,stats:t.stats}))});
+ snapshots.forEach(a=>a.teams.forEach(t=>(t.stats||[]).forEach(m=>lines.push([a.set,t.name,m.name,m.score,m.turns,m.misses,pct(m.misses,m.turns),avg(m.score,m.turns)]))));
+ if(lines.length===1){alert('出力できるメンバー分析データがありません。');return}
+ const csv='\\uFEFF'+lines.map(row=>row.map(csvCell).join(',')).join('\\r\\n');
+ const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download='モルック_セット別メンバー分析_'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+}
+teams=[{name:'チーム A',members:['','','','']},{name:'チーム B',members:['','','','']}];renderSettings();orderText();
+</script>
+<div id="setTransitionModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:none;align-items:center;justify-content:center;padding:18px">
+ <div style="background:white;color:#222;border-radius:16px;padding:20px;max-width:440px;width:100%;max-height:85vh;overflow:auto">
+  <h2 id="transitionTitle" style="margin-top:0">次のセット</h2>
+  <p id="transitionMessage"></p>
+  <div id="starterPicker" style="display:none;margin:12px 0">
+   <p><b>このセットの先攻チームを選んでください</b></p>
+   <div class="row"></div>
+  </div>
+  <div id="orderQuestion" style="display:none;margin-top:14px">
+   <p><b>投擲するメンバーの順番を替えますか？</b></p>
+   <div id="transitionOrderEditors"></div>
+   <div class="row" style="margin-top:12px"><button type="button" onclick="finishTransition(false)">今の順番で続ける</button><button type="button" class="primary" onclick="finishTransition(true)">順番を変更して続ける</button></div>
+  </div>
+ </div>
+</div>
+
+</body></html>
